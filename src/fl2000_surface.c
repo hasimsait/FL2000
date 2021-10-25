@@ -106,13 +106,15 @@ int fl2000_surface_pin_down(
 	case SURFACE_TYPE_VIRTUAL_FRAGMENTED_VOLATILE:
 	case SURFACE_TYPE_VIRTUAL_FRAGMENTED_PERSISTENT:
 		while (surface->pages_pinned != nr_pages) {
-			down_read(&current->mm->mmap_sem);
+			//down_read(&current->mm->mmap_sem);
+			mmap_read_lock(current->mm);
 			pages_pinned = fl2000_get_user_pages(
 				surface->user_buffer,
 				nr_pages,
 				pages,
 				NULL);
-			up_read(&current->mm->mmap_sem);
+			//up_read(&current->mm->mmap_sem);
+			mmap_read_unlock(current->mm);
 			if (pages_pinned <= 0) {
 				dbg_msg(TRACE_LEVEL_ERROR, DBG_PNP,
 					"get_user_pages fails with %d\n", pages_pinned);
@@ -126,7 +128,8 @@ int fl2000_surface_pin_down(
 		break;
 
 	case SURFACE_TYPE_VIRTUAL_CONTIGUOUS:
-		down_read(&current->mm->mmap_sem);
+		//down_read(&current->mm->mmap_sem);
+		mmap_read_lock(current->mm);
 		/*
 		 * work-around the user memory which is mapped from driver,
 		 * but with VM_IO, VM_PFNMAP flags. This API assumes the mmaped user addr
@@ -141,7 +144,8 @@ int fl2000_surface_pin_down(
 			pages,
 			NULL);
 		vma->vm_flags = old_flags;
-		up_read(&current->mm->mmap_sem);
+		//up_read(&current->mm->mmap_sem);
+		mmap_read_unlock(current->mm);
 		if (pages_pinned <= 0) {
 			dbg_msg(TRACE_LEVEL_ERROR, DBG_PNP,
 				"get_user_pages fails with %d\n", pages_pinned);
@@ -228,8 +232,8 @@ int fl2000_surface_map(
 		surface->mapped_buffer = vm_map_ram(
 			surface->pages,
 			surface->nr_pages,
-			-1,
-			PAGE_KERNEL);
+			-1);//,
+			//PAGE_KERNEL);
 		if (surface->mapped_buffer == NULL) {
 			dbg_msg(TRACE_LEVEL_ERROR, DBG_PNP, "vm_map_ram failed?");
 			ret_val = -ENOMEM;
