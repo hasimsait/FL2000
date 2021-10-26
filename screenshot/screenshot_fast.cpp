@@ -1,5 +1,5 @@
 // g++ xshm2.c -o xshm2 -lX11 -lXext `$cv`-Ofast -mfpmath=both -march=native -m64 -funroll-loops -mavx2 && ./xshm2
-
+// this shows how to take a screenshot using x11 and save it to screenshot.bmp
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/XShm.h>
@@ -16,6 +16,7 @@
 // Using one monitor DOESN'T improve performance! Querying a smaller subset of the screen DOES
 const uint WIDTH  = 1920>>0;
 const uint HEIGHT = 1080>>0;
+char* data;
 void saveXImageToBitmap(XImage *pImage);
 // -------------------------------------------------------
 int main(){
@@ -26,20 +27,21 @@ int main(){
     Screen* screen = window_attributes.screen;
     XShmSegmentInfo shminfo;
     XImage* ximg = XShmCreateImage(display, DefaultVisualOfScreen(screen), DefaultDepthOfScreen(screen), ZPixmap, NULL, &shminfo, WIDTH, HEIGHT);
-
     shminfo.shmid = shmget(IPC_PRIVATE, ximg->bytes_per_line * ximg->height, IPC_CREAT|0777);
     shminfo.shmaddr = ximg->data = (char*)shmat(shminfo.shmid, 0, 0);
     shminfo.readOnly = False;
     if(shminfo.shmid < 0)
-        puts("Fatal shminfo error!");;
+      puts("Fatal shminfo error!");;
     Status s1 = XShmAttach(display, &shminfo);
     printf("XShmAttach() %s\n", s1 ? "success!" : "failure!");
     double start = clock();
     double end;
     for(int i=0;i<10 ; i++){
       XShmGetImage(display, root, ximg, 0, 0, 0x00ffffff);
-      if (ximg ->data != NULL)
+      if (ximg ->data != NULL){
         saveXImageToBitmap(ximg);
+      }
+      //memset ximg->data to 0 starting from (HEIGHT-1)*WIDTH+(WIDTH-1)*3+3 to end.
       // this is bad, you should use cond timed wait to get fixed framerate.
       // screenshot instead of drm is a bad idea.
       // 0.018 is the fastest I had, 56fps is fine for me.
@@ -99,13 +101,13 @@ bmpFileHeader.bfType = 0x4D42;
 bmpFileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
 bmpFileHeader.bfReserved1 = 0;
 bmpFileHeader.bfReserved2 = 0;
-int biBitCount =32;
+int biBitCount = 32;
 int dwBmpSize = ((pImage->width * biBitCount + 31) / 32) * 4 * pImage->height;
 bmpFileHeader.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) +  dwBmpSize;
 
 bmpInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
 bmpInfoHeader.biWidth = pImage->width;
-bmpInfoHeader.biHeight = -1*pImage->height;
+bmpInfoHeader.biHeight = pImage->height;
 // sample bitmaps are displayed correctly while
 // bitmaps we save are upside down, -height fixes that.
 bmpInfoHeader.biPlanes = 1;
@@ -122,7 +124,6 @@ fp = fopen(filePath,"wb");
 
 if(fp == NULL)
     return;
-
 fwrite(&bmpFileHeader, sizeof(bmpFileHeader), 1, fp);
 fwrite(&bmpInfoHeader, sizeof(bmpInfoHeader), 1, fp);
 fwrite(pImage->data, dwBmpSize, 1, fp);

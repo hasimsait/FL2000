@@ -4,7 +4,8 @@
 //
 // Purpose: Utility Primitives
 //
-
+// changes in lines 110,117,132,148,236 are suggested by hcar in
+// https://aur.archlinux.org/packages/fl2000-dkms
 #include "fl2000_include.h"
 #include <linux/version.h>
 
